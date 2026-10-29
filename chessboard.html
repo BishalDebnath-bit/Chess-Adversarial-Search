@@ -1,0 +1,117 @@
+
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<style>
+  body { margin: 0; font-family: Arial, sans-serif; }
+  #board {
+    display: grid;
+    grid-template-columns: repeat(8, 1fr);
+    width: min(100%, 520px);
+    aspect-ratio: 1;
+    margin: auto;
+  }
+  .square {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: clamp(24px, 6vw, 48px);
+    cursor: grab;
+    user-select: none;
+  }
+  .light { background: #f0d9b5; }
+  .dark { background: #b58863; }
+  .selected { outline: 4px solid #22c55e; outline-offset: -4px; }
+</style>
+</head>
+<body>
+<div id="board"></div>
+
+<script>
+const pieces = {
+  K:"♔", Q:"♕", R:"♖", B:"♗", N:"♘", P:"♙",
+  k:"♚", q:"♛", r:"♜", b:"♝", n:"♞", p:"♟"
+};
+
+const board = document.getElementById("board");
+let position = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR";
+let selected = null;
+let dragSource = null;
+
+function render() {
+  board.innerHTML = "";
+  const rows = position.split("/");
+
+  rows.forEach((row, r) => {
+    let files = [];
+
+    for (const ch of row) {
+      if (/[1-8]/.test(ch)) {
+        for (let i = 0; i < Number(ch); i++) files.push("");
+      } else {
+        files.push(ch);
+      }
+    }
+
+    files.forEach((piece, c) => {
+      const sq = String.fromCharCode(97 + c) + (8 - r);
+      const el = document.createElement("div");
+
+      el.className =
+        "square " + ((r + c) % 2 ? "dark" : "light");
+
+      if (selected === sq) el.classList.add("selected");
+      el.textContent = pieces[piece] || "";
+      el.draggable = !!piece;
+
+      el.addEventListener("dragstart", e => {
+        dragSource = sq;
+        e.dataTransfer.setData("text/plain", sq);
+      });
+
+      el.addEventListener("dragover", e => e.preventDefault());
+
+      el.addEventListener("drop", e => {
+        e.preventDefault();
+        const from = e.dataTransfer.getData("text/plain");
+        if (from && from !== sq) {
+          window.parent.postMessage({
+            type: "chess_move",
+            from: from,
+            to: sq
+          }, "*");
+        }
+      });
+
+      el.addEventListener("click", () => {
+        if (!selected) {
+          selected = sq;
+          render();
+        } else {
+          window.parent.postMessage({
+            type: "chess_move",
+            from: selected,
+            to: sq
+          }, "*");
+          selected = null;
+        }
+      });
+
+      board.appendChild(el);
+    });
+  });
+}
+
+window.addEventListener("message", e => {
+  if (e.data && e.data.type === "chess_position") {
+    position = e.data.position;
+    selected = null;
+    render();
+  }
+});
+
+render();
+</script>
+</body>
+</html>
